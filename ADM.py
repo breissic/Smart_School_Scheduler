@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QListWidget,
-                             QLineEdit, QFormLayout, QTextEdit, QComboBox, QSpinBox, QMessageBox, QStackedWidget)
+                             QLineEdit, QFormLayout, QTextEdit, QComboBox, QSpinBox, QDateEdit, QMessageBox, QStackedWidget)
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QDate
 from database import TaskDatabase  # Import the TaskDatabase class
 
 class ADM(QWidget):
@@ -15,7 +15,7 @@ class ADM(QWidget):
         self.loadTasks()
 
     def initUI(self):
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Top bar layout for home button
         topBarLayout = QHBoxLayout()
@@ -25,6 +25,9 @@ class ADM(QWidget):
         homeButton.clicked.connect(self.home_callback)
         topBarLayout.addWidget(homeButton, alignment=Qt.AlignRight)  # Right align the home button
         layout.addLayout(topBarLayout)
+
+        # Main horizontal layout
+        mainLayout = QHBoxLayout()
 
         # Left column for tasks
         leftLayout = QVBoxLayout()
@@ -55,6 +58,11 @@ class ADM(QWidget):
         self.workloadComboBox.addItems(["Light", "Moderate", "Heavy"])
         self.workloadComboBox.setFixedWidth(150)
 
+        # Date picker for due date
+        self.dueDateEdit = QDateEdit()
+        self.dueDateEdit.setCalendarPopup(True)
+        self.dueDateEdit.setDate(QDate.currentDate())
+
         # Save button
         saveButton = QPushButton("Save Task")
         saveButton.clicked.connect(self.saveTask)
@@ -63,13 +71,19 @@ class ADM(QWidget):
         completeButton = QPushButton("Complete Task")
         completeButton.clicked.connect(self.completeTask)
 
+        # Cancel button
+        cancelButton = QPushButton("Cancel")
+        cancelButton.clicked.connect(self.cancelTask)
+
         formLayout = QFormLayout()
         formLayout.addRow("Name:", self.nameEdit)
         formLayout.addRow("Description:", self.descriptionEdit)
         formLayout.addRow("Days to Devote:", self.daysSpinBox)
         formLayout.addRow("Workload Level:", self.workloadComboBox)
+        formLayout.addRow("Due Date:", self.dueDateEdit)
         formLayout.addRow("", saveButton)
         formLayout.addRow("", completeButton)
+        formLayout.addRow("", cancelButton)
         self.detailsLayout.addLayout(formLayout)
 
         # Stacked widget to switch between empty and details view
@@ -80,9 +94,10 @@ class ADM(QWidget):
         self.rightPanel.setCurrentWidget(self.emptyWidget)
 
         # Combine layouts
-        layout.addLayout(leftLayout, 1)
-        layout.addWidget(self.rightPanel, 4)
+        mainLayout.addLayout(leftLayout, 1)
+        mainLayout.addWidget(self.rightPanel, 4)
 
+        layout.addLayout(mainLayout)
         # Set the main layout
         self.setLayout(layout)
 
@@ -98,11 +113,11 @@ class ADM(QWidget):
         self.descriptionEdit.clear()
         self.daysSpinBox.setValue(1)
         self.workloadComboBox.setCurrentIndex(0)
+        self.dueDateEdit.setDate(QDate.currentDate())
         self.rightPanel.setCurrentWidget(self.detailsWidget)  # Show the details view
 
     def taskSelected(self, current, previous):
-        if current:
-            self.is_adding_task = False
+        if current and not self.is_adding_task:
             task_id, task_name = current.text().split(": ")
             task = self.db.get_task_by_id(int(task_id))
             self.current_task_id = task_id
@@ -110,31 +125,31 @@ class ADM(QWidget):
             self.descriptionEdit.setText(task['description'])
             self.daysSpinBox.setValue(task['days'])
             self.workloadComboBox.setCurrentText(task['workload'])
+            self.dueDateEdit.setDate(QDate.fromString(task['due_date'], 'yyyy-MM-dd'))
             self.rightPanel.setCurrentWidget(self.detailsWidget)  # Show the details view
+        elif not current:
+            self.rightPanel.setCurrentWidget(self.emptyWidget)  # Show the empty view
 
     def saveTask(self):
         name = self.nameEdit.text()
         description = self.descriptionEdit.toPlainText()
         days = self.daysSpinBox.value()
         workload = self.workloadComboBox.currentText()
+        due_date = self.dueDateEdit.date().toString('yyyy-MM-dd')
 
         if self.is_adding_task:
-            if name == "" or name == " ":
-                QMessageBox.warning(self, "Error", "Task must have a name")
-                return
-            task_id = self.db.add_task(name, description, days, workload)
+            task_id = self.db.add_task(name, description, days, workload, due_date)
             self.taskList.addItem(f"{task_id}: {name}")
             self.is_adding_task = False
         elif self.current_task_id:
-            if name == "" or name == " ":
-                QMessageBox.warning(self, "Error", "Task must have a name")
-                return
-            self.db.update_task(int(self.current_task_id), name, description, days, workload)
-            # Update the task name in the list
+            self.db.update_task(int(self.current_task_id), name, description, days, workload, due_date)
             current_item = self.taskList.currentItem()
             current_item.setText(f"{self.current_task_id}: {name}")
         else:
             QMessageBox.warning(self, "Error", "No task selected.")
+
+        self.rightPanel.setCurrentWidget(self.emptyWidget)  # Show the empty view
+        self.clearSelection()
 
     def completeTask(self):
         if self.current_task_id:
@@ -144,6 +159,18 @@ class ADM(QWidget):
             self.current_task_id = None
         else:
             QMessageBox.warning(self, "Error", "No task selected.")
+
+    def cancelTask(self):
+        self.rightPanel.setCurrentWidget(self.emptyWidget)  # Show the empty view
+        self.is_adding_task = False
+
+        # Clear the selection and reset it to ensure proper state
+        self.clearSelection()
+
+    def clearSelection(self):
+        self.taskList.clearSelection()
+        self.taskList.setCurrentItem(None)
+        self.current_task_id = None
 
     def closeEvent(self, event):
         self.db.close()

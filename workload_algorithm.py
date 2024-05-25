@@ -1,5 +1,12 @@
 from datetime import datetime, timedelta
+from database import TaskDatabase
 
-def distribtue_workload(taks, current_date):
-    workload_distribution = {}
+
+def fetch_tasks():
+    db = TaskDatabase()
+    tasks = db.get_tasks()
+    db.close()
+    return tasks
+def workload_algorithm():
+    tasks = fetch_tasks()
 
