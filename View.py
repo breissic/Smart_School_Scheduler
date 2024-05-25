@@ -1,13 +1,16 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFrame, QGridLayout
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import Qt, QSize, QDate
+from workload_algorithm import workload_algorithm  # Import the workload algorithm
 
 
 class View(QWidget):
-    def __init__(self, home_callback):
+    def __init__(self, home_callback, adm_callback):
         super().__init__()
         self.home_callback = home_callback
+        self.adm_callback = adm_callback  # Callback to show ADM widget
         self.currentDate = QDate.currentDate()
+        self.schedule = workload_algorithm()  # Generate the task schedule
         self.initUI()
 
     def initUI(self):
@@ -78,8 +81,33 @@ class View(QWidget):
             dayLabel = QLabel(day.toString('dd MMM'))
             dayLabel.setAlignment(Qt.AlignTop | Qt.AlignCenter)
             dayLayout.addWidget(dayLabel)
-            dayLayout.addStretch(1)  # Push the label to the top
+
+            # Add tasks to the day
+            tasks_for_day = self.schedule.get(day.toPyDate(), [])
+            for task in tasks_for_day:
+                taskFrame = QFrame()
+                taskLayout = QVBoxLayout(taskFrame)
+                taskLabel = QLabel(task['name'])
+                taskLabel.setAlignment(Qt.AlignCenter)
+                taskFrame.setStyleSheet("background-color: lightblue; border-radius: 10px;")
+                taskLayout.addWidget(taskLabel)
+                dayLayout.addWidget(taskFrame)
+
+                # Due date task highlight
+                due_date = QDate.fromString(task['due_date'], 'yyyy-MM-dd')
+                if day == due_date:
+                    taskLabel.setText(f"{task['name']} (DUE)")
+                    taskLabel.setFont(QFont('Arial', 10, QFont.Bold))
+                    taskFrame.setStyleSheet("background-color: red; border-radius: 10px;")
+
+                # Task click event to navigate to the task in ADM
+                taskFrame.mousePressEvent = lambda event, task=task: self.showTaskInADM(task)
+
+            dayLayout.addStretch(1)  # Push the tasks to the top
             self.calendarGrid.addWidget(dayFrame, 1, i)
+
+    def showTaskInADM(self, task):
+        self.adm_callback(task)  # Use the callback to navigate to the ADM widget
 
     def showPreviousWeek(self):
         self.currentDate = self.currentDate.addDays(-7)
@@ -89,3 +117,6 @@ class View(QWidget):
         self.currentDate = self.currentDate.addDays(7)
         self.updateWeekView()
 
+    def refreshSchedule(self):
+        self.schedule = workload_algorithm()
+        self.updateWeekView()

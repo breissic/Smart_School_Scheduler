@@ -1,48 +1,46 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QLabel, QStackedWidget
+import sys
+from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QMenu, QStackedWidget, QWidget, QVBoxLayout, \
+    QLabel, QPushButton, QHBoxLayout
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from View import View
 from ADM import ADM
 
-class Menu(QMainWindow):
 
+class Menu(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
 
     def initUI(self):
-        # Create a central widget and a stacked widget
         self.stackedWidget = QStackedWidget(self)
         self.setCentralWidget(self.stackedWidget)
 
-        # Define mainMenuWidget as an instance attribute
         self.mainMenuWidget = QWidget()
         mainVLayout = QVBoxLayout(self.mainMenuWidget)
 
-        # Title Label
         titleLabel = QLabel("Auto Planner")
-        titleLabel.setFont(QFont('Arial', 24, QFont.Bold))  # Set font type, size, and weight
-        titleLabel.setAlignment(Qt.AlignCenter)  # Center the text
+        titleLabel.setFont(QFont('Arial', 24, QFont.Bold))
+        titleLabel.setAlignment(Qt.AlignCenter)
 
-        # View Button
         viewButton = QPushButton("View")
         viewButton.setFixedSize(200, 50)
         viewButton.clicked.connect(self.showView)
+
+        admButton = QPushButton("Add/Manage")
+        admButton.setFixedSize(200, 50)
+        admButton.clicked.connect(self.showADM)
+
         viewHLayout = QHBoxLayout()
         viewHLayout.addStretch(1)
         viewHLayout.addWidget(viewButton)
         viewHLayout.addStretch(1)
 
-        # Add/Manage Button
-        admButton = QPushButton("Add/Manage")
-        admButton.setFixedSize(200, 50)
-        admButton.clicked.connect(self.showADM)
         admHLayout = QHBoxLayout()
         admHLayout.addStretch(1)
         admHLayout.addWidget(admButton)
         admHLayout.addStretch(1)
 
-        # Layout organization
         mainVLayout.addStretch(1)
         mainVLayout.addWidget(titleLabel)
         mainVLayout.addSpacing(20)
@@ -51,18 +49,15 @@ class Menu(QMainWindow):
         mainVLayout.addLayout(admHLayout)
         mainVLayout.addStretch(1)
 
-        # View and ADM Widgets
-        self.viewWidget = View(self.showMainMenu)
-        self.admWidget = ADM(self.showMainMenu)
+        self.viewWidget = View(self.showMainMenu, self.showTaskInADM)
+        self.admWidget = ADM(self.showMainMenu, self.updateView)  # Pass the updateView callback
 
-        # Add widgets to stacked widget
         self.stackedWidget.addWidget(self.mainMenuWidget)
         self.stackedWidget.addWidget(self.viewWidget)
         self.stackedWidget.addWidget(self.admWidget)
 
-        # Set window parameters
         self.setGeometry(300, 300, 1920, 1080)
-        self.setWindowTitle('CarsoPlanner')
+        self.setWindowTitle('Auto Planner')
         self.show()
 
     def showView(self):
@@ -73,3 +68,11 @@ class Menu(QMainWindow):
 
     def showMainMenu(self):
         self.stackedWidget.setCurrentWidget(self.mainMenuWidget)
+
+    def showTaskInADM(self, task):
+        print(f"Navigating to ADM with task: {task['name']}")
+        self.admWidget.loadTask(task)  # Implement loadTask method in ADM to display the task
+        self.showADM()
+
+    def updateView(self):
+        self.viewWidget.refreshSchedule()  # Refresh the view widget schedule
